@@ -1,0 +1,45 @@
+# DPO Pipeline - Configuration Template
+# Copy this to config.yaml and fill in your values:
+#   cp config.yaml.example config.yaml
+#
+# IMPORTANT: config.yaml is in .gitignore and will NOT be committed.
+# Never commit your real config.yaml — it contains API keys.
+
+# --- HuggingFace Hub Authentication ---
+# Option 1: Set the HF_TOKEN environment variable:
+#   export HF_TOKEN="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# Option 2: Run `huggingface-cli login` and paste your token once.
+#   pip install huggingface_hub
+#   huggingface-cli login
+#
+# Get your token at: https://huggingface.co/settings/tokens
+# The token needs "write" scope for uploading models.
+
+# --- Local Model Endpoint (for pair generation) ---
+# LM Studio, Ollama, llama.cpp server, vLLM, etc.
+# LM Studio accepts any non-empty string as api_key.
+# Ollama doesn't need an API key at all.
+
+# --- Script-specific settings ---
+# Each script (dpo_generate_pairs.py, dpo_train.py, dpo_merge_upload.py)
+# has its own CONFIG dictionary at the top of the file.
+# Edit those directly — this file is just a reference for required values.
+
+# Required for dpo_generate_pairs.py:
+generate:
+  endpoint_url: "http://localhost:1234/v1"   # Your local model server
+  weak_model: "llama-3.2-1b-instruct"       # Small model for rejected responses
+  api_key: "not-needed-for-local"            # LM Studio accepts any string
+
+# Required for dpo_train.py:
+train:
+  base_model: "your-base-model-id-or-path"
+  dataset_name: "your_pairs.jsonl"
+  push_to_hub: false                        # Set true after huggingface-cli login
+
+# Required for dpo_merge_upload.py:
+merge:
+  base_model: "your-base-model-id-or-path"
+  adapter_path: "path/to/adapter"
+  hub_model_id: "your-username/model-name"
+  hub_private: true                         # Keep private until you're ready

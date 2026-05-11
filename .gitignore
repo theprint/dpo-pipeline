@@ -52,3 +52,6 @@ checkpoint-*/
 tmp/
 temp/
 *.tmp
+
+# Configuration (contains API keys)
+config.yaml

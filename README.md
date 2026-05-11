@@ -13,6 +13,42 @@ This pipeline provides a complete workflow for DPO fine-tuning:
 
 All scripts use a CONFIG block at the top - no command-line arguments needed.
 
+## Setup
+
+### HuggingFace Authentication (required for uploads)
+
+Before uploading models to the HuggingFace Hub, you need to authenticate. Choose one method:
+
+**Option A: Command-line login (recommended)**
+```bash
+pip install huggingface_hub
+huggingface-cli login
+# Paste your token when prompted
+```
+
+**Option B: Environment variable**
+```bash
+export HF_TOKEN="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+Get your token at: https://huggingface.co/settings/tokens (needs "write" scope).
+
+### Local Model Server (required for pair generation)
+
+You need a local model server running for `dpo_generate_pairs.py`. Any OpenAI-compatible endpoint works:
+- **LM Studio** (default: `http://localhost:1234/v1`)
+- **Ollama** (`http://localhost:11434/v1`)
+- **llama.cpp server** (`http://localhost:8080/v1`)
+
+Edit the `endpoint_url` and `weak_model` in each script's CONFIG block to match your setup.
+
+### Configuration
+
+Each script has a `CONFIG` dictionary at the top. Edit only that section — no need to modify code below it.
+See `config.yaml.example` for a reference of all settings.
+
+**Security:** Never commit API keys or tokens. The `.gitignore` blocks `config.yaml` and `.env` files.
+
 ## Quick Start
 
 ```bash
@@ -91,22 +127,6 @@ Interactive web-based tool for reviewing and calibrating preference pairs.
 
 **Usage:**
 Open directly in browser - no server needed. Load your JSONL pair file and review quality before training.
-
-## Configuration
-
-All scripts use a `CONFIG` dictionary at the top. Edit only this section - no need to modify the code below.
-
-Example from `dpo_train.py`:
-```python
-CONFIG = {
-    "base_model": "your-base-model",
-    "dataset_name": "your_pairs.jsonl",
-    "lora_r": 16,
-    "beta": 0.125,
-    "num_train_epochs": 2,
-    # ... other settings
-}
-```
 
 ## Recommended Workflow
 
