@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DPO Calibration — Human Eval</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg:        #0d0f12;
+    --surface:   #13161b;
+    --border:    #1f242c;
+    --border-hi: #2e3540;
+    --text:      #c8d0db;
+    --text-dim:  #5a6478;
+    --text-hi:   #eef1f5;
+    --accent:    #4f8ef7;
+    --accent-lo: rgba(79,142,247,0.10);
+    --chosen:    #3ecf8e;
+    --chosen-lo: rgba(62,207,142,0.10);
+    --rejected:  #f75f5f;
+    --rejected-lo: rgba(247,95,95,0.10);
+    --warn:      #f7b84f;
+    --warn-lo:   rgba(247,184,79,0.10);
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+  }
+
+  header .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  header .status {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  header .status span { color: var(--text-hi); }
+
+  main {
+    flex: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 32px 28px 60px;
+  }
+
+  /* ── Screens ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── Setup screen ── */
+  .setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 700px) { .setup-grid { grid-template-columns: 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+
+  label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  input[type="text"], input[type="file"], textarea, select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-hi);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+
+  input[type="text"]:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+  }
+
+  textarea { resize: vertical; min-height: 80px; }
+
+  select option { background: var(--surface); }
+
+  .criteria-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .criterion-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .criterion-row input { flex: 1; }
+
+  .criterion-row select { width: 110px; flex-shrink: 0; }
+
+  .btn-icon {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 8px 10px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .btn-icon:hover { border-color: var(--border-hi); color: var(--text-hi); }
+  .btn-icon.danger:hover { border-color: var(--rejected); color: var(--rejected); }
+
+  /* ── Section headers ── */
+  .section-head {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+    margin-top: 28px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-head:first-child { margin-top: 0; }
+
+  /* ── Buttons ── */
+  .btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 10px 22px;
+    text-transform: uppercase;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+
+  .btn:hover { opacity: 0.88; }
+  .btn:active { transform: scale(0.98); }
+  .btn.secondary {
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    color: var(--text);
+  }
+  .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.danger { background: var(--rejected); }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+
+  /* ── Progress bar ── */
+  .progress-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    height: 4px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+
+  .progress-fill {
+    background: var(--accent);
+    height: 100%;
+    transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* ── Pair display ── */
+  .pair-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .pair-idx {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .pair-idx span { color: var(--text-hi); font-weight: 600; }
+
+  .confidence-pills {
+    display: flex;
+    gap: 6px;
+  }
+
+  .pill {
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+    color: var(--text-dim);
+    background: none;
+  }
+
+  .pill:hover { border-color: var(--border-hi); color: var(--text); }
+  .pill.active-clear   { border-color: var(--chosen);  color: var(--chosen);  background: var(--chosen-lo); }
+  .pill.active-marginal{ border-color: var(--accent);  color: var(--accent);  background: var(--accent-lo); }
+  .pill.active-uncertain{border-color: var(--warn);    color: var(--warn);    background: var(--warn-lo); }
+
+  .prompt-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .prompt-box .box-label {
+    background: var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 5px 12px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .prompt-box .box-content {
+    padding: 14px 16px;
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.7;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  /* ── Response columns ── */
+  .responses {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 800px) { .responses { grid-template-columns: 1fr; } }
+
+  .response-card {
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.15s;
+    position: relative;
+  }
+
+  .response-card:hover { border-color: var(--border-hi); transform: translateY(-1px); }
+
+  .response-card.selected-chosen {
+    border-color: var(--chosen);
+    box-shadow: 0 0 0 1px var(--chosen), 0 4px 24px rgba(62,207,142,0.12);
+  }
+
+  .response-card.selected-rejected {
+    border-color: var(--rejected);
+    box-shadow: 0 0 0 1px var(--rejected), 0 4px 24px rgba(247,95,95,0.12);
+  }
+
+  .response-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .response-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .response-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .selected-chosen .response-badge.chosen-badge {
+    background: var(--chosen-lo);
+    color: var(--chosen);
+    border: 1px solid var(--chosen);
+    opacity: 1;
+  }
+
+  .selected-rejected .response-badge.rejected-badge {
+    background: var(--rejected-lo);
+    color: var(--rejected);
+    border: 1px solid var(--rejected);
+    opacity: 1;
+  }
+
+  .response-body {
+    padding: 14px 16px;
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.75;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .select-btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-top: 1px solid var(--border);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    background: var(--surface);
+    color: var(--text-dim);
+  }
+
+  .select-btn:hover { background: var(--border); color: var(--text-hi); }
+
+  .selected-chosen  .select-btn { background: var(--chosen-lo);   color: var(--chosen); }
+  .selected-rejected .select-btn { background: var(--rejected-lo); color: var(--rejected); }
+
+  /* ── Criteria scoring ── */
+  .criteria-scores { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+  .score-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+
+  .score-row .crit-name {
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .score-row .crit-type {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .score-buttons { display: flex; gap: 4px; }
+
+  .score-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    transition: all 0.12s;
+    min-width: 28px;
+    text-align: center;
+  }
+
+  .score-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .score-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .score-btn.active-anti { background: var(--rejected); border-color: var(--rejected); color: #fff; }
+
+  /* ── Reasoning textarea ── */
+  .reasoning-wrap { margin-bottom: 24px; }
+
+  .reasoning-wrap textarea {
+    min-height: 100px;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  /* ── Nav controls ── */
+  .eval-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Summary screen ── */
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+  }
+
+  .stat-card .stat-val {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-hi);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .export-options { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    border-radius: 6px;
+    color: var(--text-hi);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px 18px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+    z-index: 100;
+  }
+
+  #toast.show { opacity: 1; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+
+  /* ── Misc ── */
+  .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  .tag {
+    display: inline-block;
+    background: var(--accent-lo);
+    border: 1px solid rgba(79,142,247,0.25);
+    border-radius: 3px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 2px 7px;
+    text-transform: uppercase;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 28px 0;
+  }
+
+  .inline-link {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="logo">⬡ DPO Calibration</div>
+    <div class="status" id="header-status">Setup</div>
+  </header>
+
+  <main>
+
+    <!-- ═══════════════════════════════════════════
+         SCREEN 1: SETUP
+    ═══════════════════════════════════════════ -->
+    <div class="screen active" id="screen-setup">
+
+      <div class="section-head">Session Configuration</div>
+
+      <div class="setup-grid">
+        <div class="field">
+          <label>Session Name</label>
+          <input type="text" id="session-name" placeholder="e.g. reasoning-v1-calibration" value="">
+        </div>
+        <div class="field">
+          <label>Evaluator</label>
+          <input type="text" id="evaluator-name" placeholder="Your name or handle">
+        </div>
+        <div class="field full">
+          <label>Load Dataset (JSONL)</label>
+          <input type="file" id="file-input" accept=".jsonl,.json">
+          <p class="hint">JSONL with <code>prompt</code>, <code>response_a</code>, <code>response_b</code> fields — or <code>chosen</code>/<code>rejected</code> if pre-labeled (labels will be ignored for blind eval).</p>
+        </div>
+      </div>
+
+      <div class="section-head">Field Mapping</div>
+      <div class="setup-grid">
+        <div class="field">
+          <label>Prompt field</label>
+          <input type="text" id="field-prompt" value="prompt">
+        </div>
+        <div class="field">
+          <label>Response A field</label>
+          <input type="text" id="field-a" value="response_a">
+        </div>
+        <div class="field">
+          <label>Response B field</label>
+          <input type="text" id="field-b" value="response_b">
+        </div>
+        <div class="field">
+          <label>Max pairs to evaluate</label>
+          <input type="text" id="max-pairs" value="50" placeholder="50">
+        </div>
+      </div>
+
+      <div class="section-head">Evaluation Criteria</div>
+      <p class="hint" style="margin-bottom:14px;"><strong style="color:var(--warn)">Define your own criteria before starting</strong> — these are specific to your dataset and training objective. Click "+ Add Criterion" below. Criteria scores appear alongside each judgment and are embedded in the calibration export for judge training.</p>
+
+      <div class="criteria-list" id="criteria-list"></div>
+
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn secondary" onclick="addCriterion()">+ Add Criterion</button>
+      </div>
+
+      <hr class="divider">
+
+      <div class="btn-row">
+        <button class="btn" onclick="startSession()">Begin Evaluation →</button>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         SCREEN 2: EVAL
+    ═══════════════════════════════════════════ -->
+    <div class="screen" id="screen-eval">
+
+      <div class="progress-wrap">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+
+      <div class="pair-meta">
+        <div class="pair-idx">Pair <span id="pair-current">1</span> of <span id="pair-total">50</span></div>
+        <div class="confidence-pills">
+          <button class="pill" data-conf="clear"     onclick="setConfidence('clear')">Clear</button>
+          <button class="pill" data-conf="marginal"  onclick="setConfidence('marginal')">Marginal</button>
+          <button class="pill" data-conf="uncertain" onclick="setConfidence('uncertain')">Uncertain</button>
+        </div>
+      </div>
+
+      <div class="prompt-box">
+        <div class="box-label">Prompt</div>
+        <div class="box-content" id="prompt-text"></div>
+      </div>
+
+      <div class="responses">
+        <div class="response-card" id="card-a" onclick="selectResponse('a')">
+          <div class="response-header">
+            <div class="response-label">Response A</div>
+            <div class="response-badge chosen-badge">✓ Chosen</div>
+            <div class="response-badge rejected-badge">✗ Rejected</div>
+          </div>
+          <div class="response-body" id="response-a-text"></div>
+          <button class="select-btn">Select as Chosen →</button>
+        </div>
+        <div class="response-card" id="card-b" onclick="selectResponse('b')">
+          <div class="response-header">
+            <div class="response-label">Response B</div>
+            <div class="response-badge chosen-badge">✓ Chosen</div>
+            <div class="response-badge rejected-badge">✗ Rejected</div>
+          </div>
+          <div class="response-body" id="response-b-text"></div>
+          <button class="select-btn">Select as Chosen →</button>
+        </div>
+      </div>
+
+      <div class="section-head">Criterion Scores <span class="tag">A vs B</span></div>
+      <div class="criteria-scores" id="criteria-scores"></div>
+
+      <div class="section-head">Reasoning</div>
+      <div class="reasoning-wrap">
+        <textarea id="reasoning-text" placeholder="Why is the chosen response better? Reference specific criteria. Note any uncertainty or edge cases. This text trains the judge model."></textarea>
+      </div>
+
+      <div class="eval-nav">
+        <button class="btn secondary" onclick="prevPair()" id="btn-prev">← Back</button>
+        <button class="btn" onclick="nextPair()" id="btn-next">Save & Next →</button>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         SCREEN 3: SUMMARY
+    ═══════════════════════════════════════════ -->
+    <div class="screen" id="screen-summary">
+
+      <div class="section-head">Session Complete</div>
+
+      <div class="summary-stats" id="summary-stats"></div>
+
+      <div class="section-head">Export</div>
+      <p class="hint" style="margin-bottom:16px;">
+        <strong style="color:var(--text-hi)">DPO Dataset</strong> exports a clean JSONL with <code>prompt</code>, <code>chosen</code>, <code>rejected</code> — ready for TRL DPOTrainer.<br>
+        <strong style="color:var(--text-hi)">Calibration Export</strong> includes full metadata: criteria scores, reasoning, confidence — for judge calibration and drift detection.
+      </p>
+
+      <div class="export-options">
+        <button class="btn" onclick="exportDPO()">↓ DPO Dataset (.jsonl)</button>
+        <button class="btn secondary" onclick="exportCalibration()">↓ Calibration Full (.jsonl)</button>
+        <button class="btn secondary" onclick="exportCriteria()">↓ Criteria Doc (.json)</button>
+      </div>
+
+      <hr class="divider">
+
+      <div class="section-head">Criteria Insights</div>
+      <div id="criteria-insights"></div>
+
+      <hr class="divider">
+      <button class="btn secondary" onclick="resetSession()">Start New Session</button>
+
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  State
+// ══════════════════════════════════════════════════════
+let state = {
+  config: {},
+  criteria: [],
+  pairs: [],
+  judgments: [],   // one per pair, sparse — indexed by pair index
+  currentIdx: 0,
+  // per-pair transient state
+  selected: null,  // 'a' | 'b'
+  confidence: null,
+  criteriaScores: {},
+  reasoning: '',
+};
+
+// ══════════════════════════════════════════════════════
+//  Default criteria
+// ══════════════════════════════════════════════════════
+const DEFAULT_CRITERIA = [];
+
+// ══════════════════════════════════════════════════════
+//  Setup helpers
+// ══════════════════════════════════════════════════════
+function renderCriteriaList() {
+  const el = document.getElementById('criteria-list');
+  el.innerHTML = '';
+  state.criteria.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'criterion-row';
+    row.innerHTML = `
+      <input type="text" value="${escHtml(c.text)}" placeholder="Criterion description"
+             onchange="state.criteria[${i}].text = this.value">
+      <select onchange="state.criteria[${i}].type = this.value">
+        <option value="primary"   ${c.type==='primary'  ?'selected':''}>Primary</option>
+        <option value="secondary" ${c.type==='secondary'?'selected':''}>Secondary</option>
+        <option value="anti"      ${c.type==='anti'     ?'selected':''}>Anti</option>
+      </select>
+      <button class="btn-icon danger" onclick="removeCriterion(${i})">×</button>
+    `;
+    el.appendChild(row);
+  });
+}
+
+function addCriterion() {
+  state.criteria.push({ text: '', type: 'primary' });
+  renderCriteriaList();
+}
+
+function removeCriterion(i) {
+  state.criteria.splice(i, 1);
+  renderCriteriaList();
+}
+
+// ══════════════════════════════════════════════════════
+//  Session start
+// ══════════════════════════════════════════════════════
+async function startSession() {
+  const sessionName = document.getElementById('session-name').value.trim() || 'session';
+  const evaluator   = document.getElementById('evaluator-name').value.trim() || 'anonymous';
+  const maxPairs    = parseInt(document.getElementById('max-pairs').value) || 50;
+  const fp          = document.getElementById('field-prompt').value.trim() || 'prompt';
+  const fa          = document.getElementById('field-a').value.trim() || 'response_a';
+  const fb          = document.getElementById('field-b').value.trim() || 'response_b';
+  const fileInput   = document.getElementById('file-input');
+
+  // Read criteria from DOM (inputs may have changed)
+  document.querySelectorAll('.criterion-row').forEach((row, i) => {
+    state.criteria[i].text = row.querySelector('input').value;
+    state.criteria[i].type = row.querySelector('select').value;
+  });
+
+  const validCriteria = state.criteria.filter(c => c.text.trim());
+  if (!validCriteria.length) {
+    toast('Add at least one criterion before starting.'); return;
+  }
+
+  state.config = { sessionName, evaluator, maxPairs, fp, fa, fb,
+                   startedAt: new Date().toISOString() };
+  state.criteria = validCriteria;
+  state.judgments = [];
+
+  if (fileInput.files.length) {
+    try {
+      const text = await fileInput.files[0].text();
+      const lines = text.trim().split('\n').filter(Boolean);
+      const parsed = lines.map(l => JSON.parse(l));
+      state.pairs = parsed.slice(0, maxPairs).map(p => ({
+        prompt: p[fp] || p['prompt'] || '',
+        a:      p[fa] || p['response_a'] || p['chosen'] || '',
+        b:      p[fb] || p['response_b'] || p['rejected'] || '',
+        raw:    p,
+      })).filter(p => p.prompt && p.a && p.b);
+
+      if (!state.pairs.length) {
+        toast('No valid pairs found. Check field mapping.'); return;
+      }
+    } catch(e) {
+      toast('Failed to parse file: ' + e.message); return;
+    }
+  } else {
+    // Demo data if no file
+    state.pairs = generateDemoPairs(maxPairs);
+    toast('No file loaded — using demo pairs.');
+  }
+
+  state.currentIdx = 0;
+  showScreen('eval');
+  renderEvalPair();
+}
+
+// ══════════════════════════════════════════════════════
+//  Eval rendering
+// ══════════════════════════════════════════════════════
+function renderEvalPair() {
+  const total = state.pairs.length;
+  const idx   = state.currentIdx;
+  const pair  = state.pairs[idx];
+
+  // Header status
+  document.getElementById('header-status').innerHTML =
+    `<span>${idx + 1}</span> / ${total} evaluated`;
+
+  // Progress
+  document.getElementById('progress-fill').style.width =
+    `${((idx) / total * 100).toFixed(1)}%`;
+
+  document.getElementById('pair-current').textContent = idx + 1;
+  document.getElementById('pair-total').textContent   = total;
+
+  // Content
+  document.getElementById('prompt-text').textContent    = pair.prompt;
+  document.getElementById('response-a-text').textContent = pair.a;
+  document.getElementById('response-b-text').textContent = pair.b;
+
+  // Restore saved judgment for this index (if navigating back)
+  const saved = state.judgments[idx];
+  if (saved) {
+    applyJudgment(saved);
+  } else {
+    clearTransient();
+  }
+
+  // Criteria score rows
+  renderCriteriaScores();
+
+  // Prev button
+  document.getElementById('btn-prev').disabled = idx === 0;
+  document.getElementById('btn-next').textContent =
+    idx === total - 1 ? 'Finish ✓' : 'Save & Next →';
+}
+
+function clearTransient() {
+  state.selected    = null;
+  state.confidence  = null;
+  state.criteriaScores = {};
+  state.reasoning   = '';
+
+  document.getElementById('card-a').className = 'response-card';
+  document.getElementById('card-b').className = 'response-card';
+  document.querySelectorAll('.pill').forEach(p => p.className = 'pill');
+  document.getElementById('reasoning-text').value = '';
+}
+
+function applyJudgment(j) {
+  state.selected       = j.selected;
+  state.confidence     = j.confidence;
+  state.criteriaScores = { ...j.criteriaScores };
+  state.reasoning      = j.reasoning;
+
+  // Cards
+  document.getElementById('card-a').className = 'response-card' +
+    (j.selected === 'a' ? ' selected-chosen' : j.selected === 'b' ? ' selected-rejected' : '');
+  document.getElementById('card-b').className = 'response-card' +
+    (j.selected === 'b' ? ' selected-chosen' : j.selected === 'a' ? ' selected-rejected' : '');
+
+  // Confidence pills
+  document.querySelectorAll('.pill').forEach(p => {
+    p.className = 'pill' + (p.dataset.conf === j.confidence ? ` active-${j.confidence}` : '');
+  });
+
+  document.getElementById('reasoning-text').value = j.reasoning || '';
+}
+
+function renderCriteriaScores() {
+  const el = document.getElementById('criteria-scores');
+  el.innerHTML = '';
+
+  state.criteria.forEach((c, i) => {
+    const isAnti = c.type === 'anti';
+    const scores = isAnti ? [0,1,2,3] : [1,2,3,4,5,6,7];
+    const current = state.criteriaScores[i];
+
+    const row = document.createElement('div');
+    row.className = 'score-row';
+    row.innerHTML = `
+      <div>
+        <div class="crit-name">${escHtml(c.text)}</div>
+        <div class="crit-type">${c.type} ${isAnti ? '· 0=absent 3=severe' : '· 1=poor 7=excellent'}</div>
+      </div>
+      <div class="score-buttons" id="score-btns-${i}">
+        ${scores.map(s => `
+          <button class="score-btn ${current===s ? (isAnti ? 'active-anti' : 'active') : ''}"
+                  onclick="setScore(${i}, ${s}, ${isAnti})">${s}</button>
+        `).join('')}
+      </div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+function setScore(criterionIdx, score, isAnti) {
+  state.criteriaScores[criterionIdx] = score;
+  // Re-render just the button group
+  const btns = document.getElementById(`score-btns-${criterionIdx}`);
+  btns.querySelectorAll('.score-btn').forEach(btn => {
+    const v = parseInt(btn.textContent);
+    btn.className = 'score-btn' + (v === score ? (isAnti ? ' active-anti' : ' active') : '');
+  });
+}
+
+function selectResponse(which) {
+  state.selected = which;
+  const cardA = document.getElementById('card-a');
+  const cardB = document.getElementById('card-b');
+  if (which === 'a') {
+    cardA.className = 'response-card selected-chosen';
+    cardB.className = 'response-card selected-rejected';
+  } else {
+    cardB.className = 'response-card selected-chosen';
+    cardA.className = 'response-card selected-rejected';
+  }
+}
+
+function setConfidence(level) {
+  state.confidence = level;
+  document.querySelectorAll('.pill').forEach(p => {
+    p.className = 'pill' + (p.dataset.conf === level ? ` active-${level}` : '');
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  Navigation
+// ══════════════════════════════════════════════════════
+function saveCurrentJudgment() {
+  state.reasoning = document.getElementById('reasoning-text').value;
+
+  if (!state.selected) {
+    toast('Select a preferred response before continuing.');
+    return false;
+  }
+
+  const pair = state.pairs[state.currentIdx];
+  const chosen   = state.selected === 'a' ? pair.a : pair.b;
+  const rejected = state.selected === 'a' ? pair.b : pair.a;
+
+  state.judgments[state.currentIdx] = {
+    pairIdx:        state.currentIdx,
+    prompt:         pair.prompt,
+    chosen,
+    rejected,
+    selected:       state.selected,
+    confidence:     state.confidence || 'unset',
+    criteriaScores: { ...state.criteriaScores },
+    reasoning:      state.reasoning,
+    timestamp:      new Date().toISOString(),
+  };
+  return true;
+}
+
+function nextPair() {
+  if (!saveCurrentJudgment()) return;
+
+  if (state.currentIdx >= state.pairs.length - 1) {
+    finishSession();
+    return;
+  }
+  state.currentIdx++;
+  renderEvalPair();
+  window.scrollTo(0, 0);
+}
+
+function prevPair() {
+  saveCurrentJudgment(); // save even if incomplete
+  if (state.currentIdx > 0) {
+    state.currentIdx--;
+    renderEvalPair();
+    window.scrollTo(0, 0);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  Summary
+// ══════════════════════════════════════════════════════
+function finishSession() {
+  const completed = state.judgments.filter(Boolean);
+  const byConf = { clear: 0, marginal: 0, uncertain: 0, unset: 0 };
+  completed.forEach(j => { byConf[j.confidence] = (byConf[j.confidence]||0) + 1; });
+
+  document.getElementById('header-status').innerHTML =
+    `<span>${completed.length}</span> pairs labeled`;
+
+  // Stats
+  const statsEl = document.getElementById('summary-stats');
+  statsEl.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-val">${completed.length}</div>
+      <div class="stat-label">Total Labeled</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--chosen)">${byConf.clear}</div>
+      <div class="stat-label">Clear</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--accent)">${byConf.marginal}</div>
+      <div class="stat-label">Marginal</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--warn)">${byConf.uncertain}</div>
+      <div class="stat-label">Uncertain</div>
+    </div>
+  `;
+
+  // Criteria insights
+  const insightsEl = document.getElementById('criteria-insights');
+  insightsEl.innerHTML = state.criteria.map((c, i) => {
+    const scores = completed.map(j => j.criteriaScores[i]).filter(v => v !== undefined);
+    if (!scores.length) return '';
+    const avg = (scores.reduce((a,b) => a+b, 0) / scores.length).toFixed(2);
+    const max = c.type === 'anti' ? 3 : 7;
+    const pct = ((avg / max) * 100).toFixed(0);
+    return `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:13px;color:var(--text)">${escHtml(c.text)}</span>
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text-dim)">${avg} / ${max}</span>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:3px;height:5px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${c.type==='anti'?'var(--rejected)':'var(--accent)'};"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  showScreen('summary');
+}
+
+// ══════════════════════════════════════════════════════
+//  Exports
+// ══════════════════════════════════════════════════════
+function exportDPO() {
+  const completed = state.judgments.filter(Boolean);
+  const lines = completed.map(j => JSON.stringify({
+    prompt:   j.prompt,
+    chosen:   j.chosen,
+    rejected: j.rejected,
+  }));
+  download(lines.join('\n'), `${state.config.sessionName || 'dpo'}_dataset.jsonl`, 'application/jsonl');
+  toast(`Exported ${lines.length} DPO pairs.`);
+}
+
+function exportCalibration() {
+  const completed = state.judgments.filter(Boolean);
+  const lines = completed.map(j => JSON.stringify({
+    ...j,
+    criteria: state.criteria.map((c, i) => ({
+      text:  c.text,
+      type:  c.type,
+      score: j.criteriaScores[i] ?? null,
+    })),
+    session:   state.config.sessionName,
+    evaluator: state.config.evaluator,
+  }));
+  download(lines.join('\n'), `${state.config.sessionName || 'dpo'}_calibration.jsonl`, 'application/jsonl');
+  toast(`Exported ${lines.length} calibration records.`);
+}
+
+function exportCriteria() {
+  const doc = {
+    version:    1,
+    created:    state.config.startedAt,
+    session:    state.config.sessionName,
+    evaluator:  state.config.evaluator,
+    criteria:   state.criteria,
+    sampleCount: state.judgments.filter(Boolean).length,
+  };
+  download(JSON.stringify(doc, null, 2), `${state.config.sessionName || 'dpo'}_criteria.json`, 'application/json');
+  toast('Criteria document exported.');
+}
+
+// ══════════════════════════════════════════════════════
+//  Utilities
+// ══════════════════════════════════════════════════════
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
+function download(content, filename, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+  a.download = filename;
+  a.click();
+}
+
+function toast(msg, duration = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function resetSession() {
+  state = { config:{}, criteria:[], pairs:[], judgments:[], currentIdx:0,
+            selected:null, confidence:null, criteriaScores:{}, reasoning:'' };
+  initDefaultCriteria();
+  showScreen('setup');
+  document.getElementById('header-status').textContent = 'Setup';
+}
+
+// ── Demo data generator ──
+function generateDemoPairs(n) {
+  const pairs = [];
+  for (let i = 0; i < Math.min(n, 5); i++) {
+    pairs.push({
+      prompt: `Demo prompt ${i+1}: Explain why the sky is blue.`,
+      a: `<think>\nLight scattering depends on wavelength. Shorter wavelengths (blue) scatter more than longer ones (red) via Rayleigh scattering.\n</think>\nThe sky appears blue because of Rayleigh scattering — shorter blue wavelengths in sunlight scatter more when they hit atmospheric molecules, spreading blue light across the sky.`,
+      b: `The sky is blue because of the way light interacts with the atmosphere. When sunlight enters the atmosphere, it scatters. Blue light scatters more. So we see blue.`,
+      raw: {},
+    });
+  }
+  return pairs;
+}
+
+// ── Init ──
+function initDefaultCriteria() {
+  state.criteria = DEFAULT_CRITERIA.map(c => ({ ...c }));
+  renderCriteriaList();
+}
+
+initDefaultCriteria();
+</script>
+</body>
+</html>

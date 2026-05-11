@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# DPO outputs (large files)
+dpo_output/
+dpo_merged/
+tom_dpo_pairs.jsonl
+*.jsonl
+*.safetensors
+*.pt
+*.pth
+*.bin
+
+# Checkpoints
+checkpoint-*/
+**/checkpoint-*/
+
+# Logs
+*.log
+
+# HuggingFace cache
+.huggingface/
+.cache/
+
+# Environment variables
+.env
+.env.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
